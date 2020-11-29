@@ -1,6 +1,11 @@
-obj-m += lkm_ex1.o
-all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+ifneq ($(KERNELRELESE),)
+	obj-m += lkm_ex1.o
+else
+	KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+	PWD := $(shell pwd)
+default:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+endif
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
