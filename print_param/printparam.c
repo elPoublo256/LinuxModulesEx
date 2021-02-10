@@ -11,7 +11,7 @@ module_param(param_int_num, int, S_IRUGO);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("El Puablo");
 MODULE_DESCRIPTION("A simple example Linux module.");
-MODULE_VERSION("0.04");
+MODULE_VERSION("0.05");
 
 static int __init print_param_init(void)
 {

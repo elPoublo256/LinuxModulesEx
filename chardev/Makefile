@@ -1,4 +1,4 @@
-obj-m += scull2.o
+obj-m += chardev.o
 ccflags-y := -std=gnu11 -Wno-declaration-after-statement
 #FLAGS=-std=gnu99 
 all:
