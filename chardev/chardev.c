@@ -112,7 +112,6 @@ static int device_open(struct inode *n, struct file *f)
 static int device_release(struct inode *n, struct file *f)
 {
 	printk(KERN_INFO "chardev relese\n");
-	N
 	buzy = false;
 	return 0;
 }
@@ -130,7 +129,8 @@ static ssize_t device_read(struct file *f, char *buf, size_t s, loff_t *l)
 	}
 	if(s)
 	{
-		
+	//i know that copy_to_user call acces_ok and if it return true cal __copy_to_user
+	//but i get this knowleg after i writen this code and i too lezy change this.	
 		if(access_ok(VERIFY_WRITE,buf,s))
 			{
 					size_t s_read = size_buf - *l;
@@ -157,7 +157,7 @@ static ssize_t device_read(struct file *f, char *buf, size_t s, loff_t *l)
 	return 0;
 }
 
-inline ssize_t copy_from_user_check(const char* __user ubuf, size_t s, size_t dist)
+static inline ssize_t copy_from_user_check(const char* __user ubuf, size_t s, size_t dist)
 {
 	if(dist + s > SIZE_BUF)
 	{
@@ -177,7 +177,7 @@ inline ssize_t copy_from_user_check(const char* __user ubuf, size_t s, size_t di
 		return s;
 	}		
 }
-inline ssize_t write_device_success(const char* __user ubuf, size_t s, loff_t *l)
+static inline ssize_t write_device_success(const char* __user ubuf, size_t s, loff_t *l)
 {
 	if(*l == size_buf)
 	{
