@@ -5,6 +5,8 @@
 #include <linux/cdev.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
+#include <linux/semaphore.h> 
+#include <linux/mutex.h>//header for using mutex
 //#include "page.h"
 static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
@@ -15,7 +17,9 @@ static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
 
 static int major = 0;
 static int minor = 0;
-
+//static struct semaphore *sem_write; for linux 2.6.2
+static struct mutex *mut_wr;
+static struct mutex *mut_open;
 
 #define SUCCESS 0
 #define DEVICE_NAME "mychardev"	/* Dev name as it appears in /proc/devices   */
@@ -40,6 +44,9 @@ static bool is_dev_add = false;
 static int __init init_chardev(void)
 {
 	dev_t devno;
+	//init_MUTEX(sem_write); for linux 2.6.2
+	mutex_init(mut_wr);
+	mutex_init(mut_open);
 	int res_alloc_dev;
 	res_alloc_dev = alloc_chrdev_region(&devno, minor,1,DEVICE_NAME);
 	if(res_alloc_dev)
@@ -103,16 +110,22 @@ static bool buzy = false;
 static int device_open(struct inode *n, struct file *f)
 {
 	printk(KERN_INFO "chardev open\n");
+	mutex_lock(mut_open);
 	if(buzy)
+	{
+		mutex_unlock(mut_open);
 		return -EBUSY;
-
+	}
+	mutex_unlock(mut_open);
 	buzy = true;
 	return 0;
 }
 static int device_release(struct inode *n, struct file *f)
 {
+	mutex_lock(mut_open);
 	printk(KERN_INFO "chardev relese\n");
 	buzy = false;
+	mutex_unlock(mut_open);
 	return 0;
 }
 inline size_t ready_read(loff_t *l)
@@ -122,6 +135,7 @@ inline size_t ready_read(loff_t *l)
 static ssize_t device_read(struct file *f, char *buf, size_t s, loff_t *l)
 {
 	printk(KERN_INFO "chardev read\n");
+
 	if(*l >= size_buf)
 	{
 		printk(KERN_INFO "user file pos biger then size dev_buf\n");
@@ -133,17 +147,20 @@ static ssize_t device_read(struct file *f, char *buf, size_t s, loff_t *l)
 	//but i get this knowleg after i writen this code and i too lezy change this.	
 		if(access_ok(VERIFY_WRITE,buf,s))
 			{
+					mutex_lock(mut_wr);
 					size_t s_read = size_buf - *l;
 					if(s <= s_read)
 					{
 						printk(KERN_INFO "user read full request s=%lu\n",s);
 						copy_to_user(buf, dev_buf + *l, s);
+						mutex_unlock(mut_wr);
 						return s;	
 					}
 					else if(s > s_read)
 					{
 						printk(KERN_INFO "user try read too much\n");
 						copy_to_user(buf, dev_buf + *l, s_read);
+						mutex_unlock(mut_wr);
 					       return s_read;	
 					}
 			}
@@ -166,16 +183,21 @@ static inline ssize_t copy_from_user_check(const char* __user ubuf, size_t s, si
 	}
 
 	printk(KERN_INFO "write to dev %lub\n", s);
+	mutex_lock(mut_wr);
+	ssize_t res;
 	if(copy_from_user(dev_buf + dist, ubuf,s))
 	{
 		printk(KERN_ERR "error access write dev\n");
-		return -EIO;
+		
+		res = -EIO;
 	}
 	else
 	{
 		size_buf = dist + s;
-		return s;
-	}		
+		res = s;
+	}
+	mutex_unlock(mut_wr);
+	return res;	
 }
 static inline ssize_t write_device_success(const char* __user ubuf, size_t s, loff_t *l)
 {
@@ -201,6 +223,7 @@ static inline ssize_t write_device_success(const char* __user ubuf, size_t s, lo
 
 static ssize_t device_write(struct file *f, const char __user *buf, size_t s, loff_t *l)
 {
+	mutex_lock(mut_wr);
 	printk(KERN_INFO "chardev write\n");
 	if(dev_buf == NULL)
 	{
@@ -210,17 +233,20 @@ static ssize_t device_write(struct file *f, const char __user *buf, size_t s, lo
 	if(*l >= SIZE_BUF)
         {
                 printk(KERN_INFO "user file pos biger then size dev_buf\n");
+		mutex_unlock(mut_wr);
                 return -EIO;//TODO END OF FILE
         }
 	if(dev_buf)
 	{
 		if(access_ok(VERIFY_READ,buf,s))
 				{
+					mutex_unlock(mut_wr);
 					return write_device_success(buf,s,l);
 				}
 		else
 		{
 			printk(KERN_INFO "error access user buf for read");
+			mutex_unlock(mut_wr);
 		       return -EIO;
 		}	       
 		 	
@@ -229,5 +255,6 @@ static ssize_t device_write(struct file *f, const char __user *buf, size_t s, lo
 	{
 		printk(KERN_ERR "error allocate dev_buf\n");
 	}
+	mutex_unlock(mut_wr);
 	return 0;
 }
