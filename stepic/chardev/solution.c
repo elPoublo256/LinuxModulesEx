@@ -10,7 +10,7 @@ static int device_open(struct inode *, struct file *);
 static int device_release(struct inode *, struct file *);
 static ssize_t device_read(struct file *, char *, size_t, loff_t *);
 static ssize_t device_write(struct file *, const char *, size_t, loff_t *);
-
+static loff_t device_lseek(struct file *, loff_t, int);
 
 
 static int major = 240;
@@ -29,7 +29,9 @@ static struct file_operations fops = {
 	.read = device_read,
 	.write = device_write,
 	.open = device_open,
-	.release = device_release
+	.release = device_release,
+	.llseek = device_lseek
+
 };
 
 
@@ -38,6 +40,9 @@ static struct cdev *dev = NULL;
 
 static bool is_dev_registerd = false;
 static bool is_dev_add = false;
+static size_t size_buf;
+
+static struct class *my_class;
 
 static int __init init_chardev(void)
 {
@@ -65,6 +70,9 @@ static int __init init_chardev(void)
 	}	
 	is_dev_add = true;
 	printk(KERN_INFO "register chardev SUCCSES\n");
+	my_class = class_careate(THIS_MODULE,"my_class");
+	device_create(my_class, NULL, devno, DEVICE_NAME);
+       printk(KERN_INFO "create my_class\n");	
 	return 0;
 }
 
@@ -107,6 +115,7 @@ static int device_release(struct inode *n, struct file *f)
 }
 
 static bool is_eof = false;
+static loff_t cure_pos = 0;
 static ssize_t device_read(struct file *f, __user char *buf, size_t s, loff_t *l)
 {
 	printk(KERN_INFO "chardev read\n");
@@ -149,4 +158,28 @@ static ssize_t device_write(struct file *f, const char __user *buf, size_t s, lo
 	printk(KERN_INFO "device_write\n");
 	size_buf += s;
 	return s;
+}
+
+
+static loff_t device_lseek(struct file * fp, loff_t ofset, int origin)
+{
+	loff_t new_pos;
+	switch(origin)
+	{
+	case SEEK_SET:
+		new_pos = ofset;
+		break;
+	case SEEK_END:
+		new_pos = size_buf + ofset; 
+		break;
+	case SEEK_CUR:
+		new_pos = cure_pos + ofset;
+		break;
+	default:
+		return -EINVAL;
+
+	}
+	new_pos = new_pos < size_buf ? new_pos : size_buf;
+	new_pos >= 0 ? new_pos : 0;
+	f->f_pos = new_pos;
 }
