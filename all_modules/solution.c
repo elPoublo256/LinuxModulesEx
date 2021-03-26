@@ -66,8 +66,6 @@ static ssize_t my_sys_show(struct kobject *kobj,
 				{
 					return;
 				}
-				if(next == end->prev)
-					break;
         }
 	return size;
 }
@@ -129,35 +127,27 @@ static int module_compate(void* priv_dat, struct list_head *la, struct list_head
 static inline void all_modules(void)
 {
 	int i =0;
-	struct module* mod = THIS_MODULE;
+	struct module* mod;
 	struct module* this_mod = THIS_MODULE;
 	struct list_head* next = NULL;
 	struct list_head* end = mod->list.prev;
-	list_for_each(next,&this_mod->list)
+	list_for_each(next,this_mod->list.prev)
 	{
 		mod = list_entry(next, struct module, list);
 		struct module* new_mod = kmalloc(sizeof(struct module),GFP_KERNEL);
-		strcpy((char*)new_mod->name, mod->name);
+		if(!strcpy((char*)new_mod->name, mod->name))
+		{
+			strcpy(new_mod->name, "solution");
+		};
 		INIT_LIST_HEAD(&new_mod->list);
-		printk(KERN_INFO "add mod name:{%s} in list", new_mod->name);
-		if(!i)
-		{
-			strcpy(module_list->name, mod->name);
-		}
-		else
-		{
+		printk(KERN_INFO "add mod name:{%s} in list i=%d", new_mod->name,i);
 
 		list_add(&new_mod->list,&module_list->list);
 
-				if(i > 100)
-				{
-					printk(KERN_ERR "AAAAAAAAA i = 100\n");
-					return;
-				}
-				if(next==end)
-				{
-					break;
-				}
+		if(i > 100)
+		{
+			printk(KERN_ERR "AAAAAAAAA i = 100\n");
+			return;
 		}
 		i++;
 
@@ -168,20 +158,15 @@ static void print_list_mod(struct module* mod)
 {
 	printk(KERN_INFO "--------------print_list_mod--------------\n");
 	struct list_head *next;
+	struct module* _mod;
 	struct list_head *end = mod->list.next;
 	int i = 0;
 	list_for_each(next, &mod->list)
         {
 
-                mod = list_entry(next, struct module, list);
-                printk(KERN_INFO "mod name:{%s} i=%d", mod->name, i);
+                _mod = list_entry(next, struct module, list);
+                printk(KERN_INFO "mod name:{%s} i=%d", _mod->name, i);
 				i++;
-				if(i > 100)
-				{
-					return;
-				}
-				if(next == end->prev)
-					break;
         }
 }
 
@@ -202,14 +187,16 @@ int __init init_kobj(void)
 	}
 
 	module_list = kmalloc(sizeof(struct module), GFP_KERNEL);
+	//sprintf(module_list->name, "solution");
 	INIT_LIST_HEAD(&module_list->list);
 
-
-
+	print_list_mod(THIS_MODULE);
 
 	all_modules();
+	printk(KERN_INFO "----------before sort--------------\n");
+	print_list_mod(module_list);
 	list_sort(NULL, &module_list->list, module_compate);
-
+	printk(KERN_INFO "----------After sort--------------\n");
 	print_list_mod(module_list);
 	return 0;// retval;
 }
